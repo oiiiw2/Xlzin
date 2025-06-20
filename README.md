@@ -1,4 +1,4 @@
--- PAINEL XLZIN - COMPLETO (KEY, ESP, GRUDAR MIRA com HITBOX, FLY MOBILE, NOCLIP, INVISIBILIDADE, SPEED)
+-- PAINEL XLZIN - COMPLETO (KEY, ESP, GRUDAR MIRA com HITBOX, FLY MOBILE, NOCLIP, INVISIBILIDADE, SPEED SLIDER)
 -- Feito por XLZIN, ajustes Copilot. Destaca inimigos, painel ativação, respawn seguro.
 -- Grudar Mira agora deixa o inimigo focado com HITBOX MAIOR!
 
@@ -238,6 +238,7 @@ addToggle("GRUDAR MIRA", "grudarMira", Color3.fromRGB(120, 60, 120))
 addToggle("FLY (mobile/setas)", "fly", Color3.fromRGB(60, 80, 100))
 addToggle("INVISIBILIDADE", "invis", Color3.fromRGB(60, 100, 60))
 
+-- ==== VELOCIDADE COM SLIDER ====
 local speedBtn = Instance.new("TextButton")
 speedBtn.Size = UDim2.new(0.93,0,0.11,0)
 speedBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -250,8 +251,8 @@ Instance.new("UICorner", speedBtn).CornerRadius = UDim.new(0.22,0)
 
 local speedGui = Instance.new("Frame")
 speedGui.Name = "SpeedSelectorFrame"
-speedGui.Size = UDim2.new(0, 300, 0, 200)
-speedGui.Position = UDim2.new(0.5, -150, 0.16, 0)
+speedGui.Size = UDim2.new(0, 340, 0, 150)
+speedGui.Position = UDim2.new(0.5, -170, 0.16, 0)
 speedGui.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 speedGui.BackgroundTransparency = 0.09
 speedGui.BorderSizePixel = 0
@@ -261,13 +262,54 @@ speedGui.Visible = false
 Instance.new("UICorner", speedGui).CornerRadius = UDim.new(0, 16)
 
 local speedTitle = Instance.new("TextLabel")
-speedTitle.Size = UDim2.new(1, 0, 0, 48)
+speedTitle.Size = UDim2.new(1, 0, 0, 38)
 speedTitle.BackgroundTransparency = 1
 speedTitle.Text = "Velocidade do Jogador"
 speedTitle.Font = Enum.Font.GothamBold
 speedTitle.TextSize = 21
 speedTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 speedTitle.Parent = speedGui
+
+-- Slider base
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.8, 0, 0, 14)
+sliderBg.Position = UDim2.new(0.1, 0, 0, 54)
+sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = speedGui
+Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1,0)
+
+-- Slider drag
+local sliderDrag = Instance.new("Frame")
+sliderDrag.Size = UDim2.new(0, 18, 0, 24)
+sliderDrag.Position = UDim2.new(0, 0, 0, -5)
+sliderDrag.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+sliderDrag.BorderSizePixel = 0
+sliderDrag.Parent = sliderBg
+Instance.new("UICorner", sliderDrag).CornerRadius = UDim.new(1,0)
+
+-- Valor da velocidade
+local speedVal = Instance.new("TextLabel")
+speedVal.Size = UDim2.new(1, 0, 0, 28)
+speedVal.Position = UDim2.new(0,0,0,80)
+speedVal.BackgroundTransparency = 1
+speedVal.Text = "Velocidade: 16"
+speedVal.TextColor3 = Color3.fromRGB(200,200,200)
+speedVal.TextScaled = true
+speedVal.Font = Enum.Font.GothamBold
+speedVal.Parent = speedGui
+
+-- Botão aplicar velocidade
+local aplicarBtn = Instance.new("TextButton")
+aplicarBtn.Size = UDim2.new(0.38,0,0,32)
+aplicarBtn.Position = UDim2.new(0.31,0,0,112)
+aplicarBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 150)
+aplicarBtn.Text = "APLICAR"
+aplicarBtn.TextColor3 = Color3.fromRGB(255,255,255)
+aplicarBtn.TextScaled = true
+aplicarBtn.Font = Enum.Font.GothamBold
+aplicarBtn.Parent = speedGui
+Instance.new("UICorner", aplicarBtn).CornerRadius = UDim.new(1,0)
 
 local speedMinButton = Instance.new("TextButton")
 speedMinButton.Size = UDim2.new(0, 36, 0, 36)
@@ -292,41 +334,60 @@ speedRestoreButton.Visible = false
 speedRestoreButton.Parent = gui
 Instance.new("UICorner", speedRestoreButton).CornerRadius = UDim.new(1, 0)
 
-local options = {
-    {Name = "Baixa (lenta)", Speed = 8, Color = Color3.fromRGB(90, 90, 90)},
-    {Name = "Média", Speed = 16, Color = Color3.fromRGB(70, 120, 150)},
-    {Name = "Rápida", Speed = 150, Color = Color3.fromRGB(120, 60, 120)},
-}
-for i, opt in ipairs(options) do
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0.8, 0, 0, 36)
-    button.Position = UDim2.new(0.1, 0, 0, 50 + (i-1)*46)
-    button.BackgroundColor3 = opt.Color
-    button.Text = opt.Name
-    button.Font = Enum.Font.Gotham
-    button.TextSize = 20
-    button.TextColor3 = Color3.fromRGB(255,255,255)
-    button.AutoButtonColor = true
-    button.Parent = speedGui
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 12)
-    button.MouseButton1Click:Connect(function()
-        local char = player.Character or player.CharacterAdded:Wait()
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = opt.Speed
-        end
-    end)
+local UIS = game:GetService("UserInputService")
+local dragging = false
+local speedValue = 16
+local minSpeed, maxSpeed = 0, 250
+
+-- Função para atualizar posição do slider e valor
+local function updateSlider(x)
+    local abs = sliderBg.AbsoluteSize.X
+    local rel = math.clamp((x - sliderBg.AbsolutePosition.X) / abs, 0, 1)
+    sliderDrag.Position = UDim2.new(rel, -9, 0, -5)
+    speedValue = math.floor(minSpeed + rel * (maxSpeed - minSpeed) + 0.5)
+    speedVal.Text = "Velocidade: "..speedValue
 end
+
+sliderDrag.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSlider(input.Position.X)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+sliderBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        updateSlider(input.Position.X)
+        dragging = true
+    end
+end)
+
+aplicarBtn.MouseButton1Click:Connect(function()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = speedValue
+    end
+end)
+
+speedBtn.MouseButton1Click:Connect(function()
+    speedGui.Visible = not speedGui.Visible
+    speedRestoreButton.Visible = false
+end)
 speedMinButton.MouseButton1Click:Connect(function()
     speedGui.Visible = false
     speedRestoreButton.Visible = true
 end)
 speedRestoreButton.MouseButton1Click:Connect(function()
     speedGui.Visible = true
-    speedRestoreButton.Visible = false
-end)
-speedBtn.MouseButton1Click:Connect(function()
-    speedGui.Visible = not speedGui.Visible
     speedRestoreButton.Visible = false
 end)
 
