@@ -539,7 +539,7 @@ function stopGrudarMira()
     end
 end
 
--- ==== FLY MOBILE (DELTA) ====
+-- ==== FLY MOBILE (DELTA) - CORRIGIDO PARA FUNCIONAR APÓS MORTE ====
 do
     local flySpeed = 50
     local UIS = game:GetService("UserInputService")
@@ -550,60 +550,68 @@ do
         return _G.FlyLiberadoNoPainel == true
     end
 
-    local function waitChar()
-        local char = player.Character or player.CharacterAdded:Wait()
-        return char, char:WaitForChild("Humanoid"), char:WaitForChild("HumanoidRootPart")
-    end
-
-    local character, humanoid, humanoidRootPart = waitChar()
+    -- Variáveis compartilhadas entre respawns
     local flying = false
-    local flyConn
+    local flyConn = nil
     local movement = Vector3.new()
     local vertical = 0
+    local humanoid, humanoidRootPart
+    local btnUp, btnDown, btnFly
 
-    local function createButton(name, pos, txt, size)
-        local btn = Instance.new("ScreenGui")
-        btn.Name = name.."Gui"
-        btn.ResetOnSpawn = false
-        btn.Parent = game.CoreGui or player:WaitForChild("PlayerGui")
-        local b = Instance.new("TextButton")
-        b.Name = name
-        b.Text = txt
-        b.Size = size or UDim2.new(0, 100, 0, 100)
-        b.Position = pos
-        b.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        b.TextColor3 = Color3.fromRGB(255,255,255)
-        b.BackgroundTransparency = 0.35
-        b.Font = Enum.Font.GothamBold
-        b.TextScaled = true
-        b.Parent = btn
-        return b
+    -- Função para criar botões apenas uma vez
+    local function createButtons()
+        if btnUp and btnDown and btnFly then return end
+        local function createButton(name, pos, txt, size)
+            local btn = Instance.new("ScreenGui")
+            btn.Name = name.."Gui"
+            btn.ResetOnSpawn = false
+            btn.Parent = game.CoreGui or player:WaitForChild("PlayerGui")
+            local b = Instance.new("TextButton")
+            b.Name = name
+            b.Text = txt
+            b.Size = size or UDim2.new(0, 100, 0, 100)
+            b.Position = pos
+            b.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            b.TextColor3 = Color3.fromRGB(255,255,255)
+            b.BackgroundTransparency = 0.35
+            b.Font = Enum.Font.GothamBold
+            b.TextScaled = true
+            b.Parent = btn
+            return b
+        end
+        btnUp = createButton("BtnUp", UDim2.new(1, -110, 1, -250), "▲")
+        btnDown = createButton("BtnDown", UDim2.new(1, -110, 1, -130), "▼")
+        btnFly = createButton("BtnFly", UDim2.new(1, -160, 1, -370), "Fly", UDim2.new(0,100,0,50))
+
+        btnUp.Visible = false
+        btnDown.Visible = false
+        btnFly.Visible = false
+
+        btnUp.MouseButton1Down:Connect(function() if flying then vertical = 1 end end)
+        btnUp.MouseButton1Up:Connect(function() if flying then vertical = 0 end end)
+        btnDown.MouseButton1Down:Connect(function() if flying then vertical = -1 end end)
+        btnDown.MouseButton1Up:Connect(function() if flying then vertical = 0 end end)
+
+        btnFly.MouseButton1Click:Connect(function()
+            if flying then
+                stopFly()
+            else
+                startFly()
+            end
+        end)
     end
 
-    local btnUp = createButton("BtnUp", UDim2.new(1, -110, 1, -250), "▲")
-    local btnDown = createButton("BtnDown", UDim2.new(1, -110, 1, -130), "▼")
-    local btnFly = createButton("BtnFly", UDim2.new(1, -160, 1, -370), "Fly", UDim2.new(0,100,0,50))
+    -- Função para atualizar humanoid e rootpart
+    local function setCharRefs()
+        local char = player.Character or player.CharacterAdded:Wait()
+        humanoid = char:WaitForChild("Humanoid")
+        humanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    end
 
-    btnUp.Visible = false
-    btnDown.Visible = false
-    btnFly.Visible = false
-
-    btnUp.MouseButton1Down:Connect(function()
-        if flying then vertical = 1 end
-    end)
-    btnUp.MouseButton1Up:Connect(function()
-        if flying then vertical = 0 end
-    end)
-    btnDown.MouseButton1Down:Connect(function()
-        if flying then vertical = -1 end
-    end)
-    btnDown.MouseButton1Up:Connect(function()
-        if flying then vertical = 0 end
-    end)
-
-    local function startFly()
+    function startFly()
         if flying then return end
         flying = true
+        if not humanoid or not humanoidRootPart then setCharRefs() end
         local bodyVel = Instance.new("BodyVelocity")
         bodyVel.Name = "Delta_FlyVel"
         bodyVel.MaxForce = Vector3.new(1, 1, 1) * 1e6
@@ -613,6 +621,7 @@ do
         btnDown.Visible = true
         btnFly.Text = "Unfly"
         flyConn = RunService.RenderStepped:Connect(function()
+            if not humanoid or not humanoidRootPart then return end
             bodyVel.Velocity = Vector3.new(
                 movement.X * flySpeed,
                 vertical * flySpeed,
@@ -629,19 +638,20 @@ do
         })
     end
 
-    local function stopFly()
+    function stopFly()
         flying = false
-        if humanoidRootPart:FindFirstChild("Delta_FlyVel") then
+        if humanoidRootPart and humanoidRootPart:FindFirstChild("Delta_FlyVel") then
             humanoidRootPart.Delta_FlyVel:Destroy()
         end
         if flyConn then
             flyConn:Disconnect()
+            flyConn = nil
         end
         vertical = 0
         btnUp.Visible = false
         btnDown.Visible = false
         btnFly.Text = "Fly"
-        humanoid.Sit = false
+        if humanoid then humanoid.Sit = false end
         StarterGui:SetCore("SendNotification", {
             Title = "FLY DESATIVADO",
             Text = "Voo desligado.",
@@ -649,27 +659,17 @@ do
         })
     end
 
-    btnFly.MouseButton1Click:Connect(function()
-        if flying then
-            stopFly()
-        else
-            startFly()
-        end
-    end)
-
     local function updateMovement()
-        if UIS.TouchEnabled then
-            if humanoid then
-                local moveDir = humanoid.MoveDirection
-                if flying then
-                    movement = Vector3.new(moveDir.X, 0, moveDir.Z)
-                end
+        if UIS.TouchEnabled and humanoid then
+            local moveDir = humanoid.MoveDirection
+            if flying then
+                movement = Vector3.new(moveDir.X, 0, moveDir.Z)
             end
         end
     end
-
     RunService.RenderStepped:Connect(updateMovement)
 
+    -- Monitora painel
     local function painelCheckLoop()
         while true do
             local liberado = isFlyLiberadoNoPainel()
@@ -681,6 +681,18 @@ do
         end
     end
 
+    -- Reaplica FLY ao respawn se ativo
+    player.CharacterAdded:Connect(function()
+        wait(1)
+        setCharRefs()
+        if flying then
+            startFly()
+        end
+    end)
+
+    -- Inicialização
+    createButtons()
+    setCharRefs()
     spawn(painelCheckLoop)
 end
 
