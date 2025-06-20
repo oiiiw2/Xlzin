@@ -1,17 +1,17 @@
--- Painel Preto Moderno: KEY, VELOCIDADE, ESP, ATRAVESSAR PAREDE, GRUDAR MIRA, FLY (mobile/setas), INVISIBILIDADE
--- Feito por XLZIN (versão aprimorada, fly sem subir/ descer sozinho, funções mantidas após respawn, grudar mira ativável)
--- MODIFICADO: Todos os inimigos ficam vermelhos (Highlight vermelho) independente da distância
+-- PAINEL XLZIN - COMPLETO (KEY, ESP, GRUDAR MIRA com HITBOX, FLY MOBILE, NOCLIP, INVISIBILIDADE, SPEED)
+-- Feito por XLZIN, ajustes Copilot. Destaca inimigos, painel ativação, respawn seguro.
+-- Grudar Mira agora deixa o inimigo focado com HITBOX MAIOR!
 
 local KEY_CORRETA = "sxTKQP365"
 local player = game.Players.LocalPlayer
+_G.FlyLiberadoNoPainel = false
 
--- GUI principal
 local gui = Instance.new("ScreenGui")
 gui.Name = "PainelXLZIN"
 gui.Parent = game:GetService("CoreGui")
 gui.ResetOnSpawn = false
 
--- Painel de Key (preto, arredondado)
+-- Painel de Key
 local keyPanel = Instance.new("Frame")
 keyPanel.Name = "KeyPanel"
 keyPanel.Size = UDim2.new(0, 340, 0, 140)
@@ -72,10 +72,10 @@ keyStatus.TextScaled = true
 keyStatus.Font = Enum.Font.Gotham
 keyStatus.TextColor3 = Color3.fromRGB(255,80,80)
 
--- Painel principal preto (arredondado, borda cinza, minimizar/restaurar)
+-- Painel principal
 local painel = Instance.new("Frame", gui)
-painel.Size = UDim2.new(0, 420, 0, 330)
-painel.Position = UDim2.new(0.5, -210, 0.5, -165)
+painel.Size = UDim2.new(0, 420, 0, 370)
+painel.Position = UDim2.new(0.5, -210, 0.5, -185)
 painel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 painel.Visible = false
 painel.BorderSizePixel = 0
@@ -135,7 +135,7 @@ optionFrame.Parent = painel
 
 local scroll = Instance.new("ScrollingFrame", optionFrame)
 scroll.Size = UDim2.new(1, 0, 1, 0)
-scroll.CanvasSize = UDim2.new(0, 0, 1.45, 0)
+scroll.CanvasSize = UDim2.new(0, 0, 1.7, 0)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 8
@@ -145,10 +145,8 @@ UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIList.VerticalAlignment = Enum.VerticalAlignment.Top
 UIList.SortOrder = Enum.SortOrder.LayoutOrder
 
-local estado = {esp=false, noclip=false, grudarMira=false, fly=false, invis=false}
-local noclipConn, espConns, grudarMiraConn, flyConn = nil, {}, nil, nil
-local flyVertical = 0
-local UpBtn, DownBtn
+local estado = {esp=false, noclip=false, grudarMira=false, invis=false, fly=false}
+local noclipConn, espConns, grudarMiraConn = nil, {}, nil
 
 local function addToggle(label, stateKey, color)
     local line = Instance.new("Frame")
@@ -225,7 +223,7 @@ local function addToggle(label, stateKey, color)
                 stopGrudarMira()
             end
         elseif stateKey == "fly" then
-            if estado.fly then ativarFly() else desativarFly() end
+            _G.FlyLiberadoNoPainel = estado.fly
         elseif stateKey == "invis" then
             if estado.invis then ativarInvisibilidade() else desativarInvisibilidade() end
         end
@@ -332,25 +330,20 @@ speedBtn.MouseButton1Click:Connect(function()
     speedRestoreButton.Visible = false
 end)
 
--- Funções ESP
-espConns = {}
-
--- HIGHLIGHT TODOS INIMIGOS (INDEPENDENTE DA DISTÂNCIA)
-local allEnemyHighlights = {}
+-- ==== ESP/GRUDAR MIRA ====
 local function isEnemy(p)
     if p.Team ~= nil and player.Team ~= nil then
         return p.Team ~= player.Team
     end
-    return true -- Se não houver Team, considera todos inimigos
+    return true
 end
 
-local function highlightAllEnemies()
-    -- Remove highlights antigos
-    for _, h in pairs(allEnemyHighlights) do
-        pcall(function() h:Destroy() end)
-    end
-    allEnemyHighlights = {}
+local espConns = {}
+local allEnemyHighlights = {}
 
+local function highlightAllEnemies()
+    for _, h in pairs(allEnemyHighlights) do pcall(function() h:Destroy() end) end
+    allEnemyHighlights = {}
     for _,p in pairs(game.Players:GetPlayers()) do
         if p ~= player and isEnemy(p) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local exists = false
@@ -376,9 +369,7 @@ local function highlightAllEnemies()
 end
 
 local function removeAllEnemyHighlights()
-    for _, h in pairs(allEnemyHighlights) do
-        pcall(function() h:Destroy() end)
-    end
+    for _, h in pairs(allEnemyHighlights) do pcall(function() h:Destroy() end) end
     allEnemyHighlights = {}
     for _, h in pairs(game:GetService("CoreGui"):GetChildren()) do
         if h:IsA("Highlight") and h.Name == "EnemyGlobalHighlight" then
@@ -443,7 +434,7 @@ function desativarESP()
     removeAllEnemyHighlights()
 end
 
--- GRUDAR MIRA SÓ EM INIMIGOS/OUTRO TIME, mas highlight vermelho em todos
+-- === GRUDAR MIRA (AIMLOCK) + HITBOX ===
 local GRUDAR_MIRA_RANGE = 80
 local aimlockHighlight
 local grudarMiraConn
@@ -473,8 +464,8 @@ local function setHitboxSize(target, big)
             if big then
                 if not hitboxParts[part] then
                     hitboxParts[part] = part.Size
-                    part.Size = part.Size * 2
-                    part.Transparency = 0.4
+                    part.Size = part.Size * 2 -- Aumenta o tamanho
+                    part.Transparency = 0.4   -- Opcional: mais visível
                     part.Color = Color3.new(1,0,0)
                 end
             else
@@ -513,7 +504,7 @@ function startGrudarMira()
     grudarMiraConn = game:GetService("RunService").RenderStepped:Connect(function()
         if not estado.grudarMira then
             updateAimlockHighlight(nil)
-            removeAllEnemyHighlights()
+            -- Limpa hitbox de todos
             for _, p in pairs(game.Players:GetPlayers()) do
                 if p ~= player then setHitboxSize(p,false) end
             end
@@ -521,16 +512,16 @@ function startGrudarMira()
         end
 
         highlightAllEnemies()
-
         local target = getClosestEnemyPlayerRange()
         if target and target.Character and target.Character:FindFirstChild("Head") then
             local cam = workspace.CurrentCamera
             cam.CFrame = CFrame.new(cam.CFrame.Position, target.Character.Head.Position)
-            setHitboxSize(target,true)
+            updateAimlockHighlight(target)
+            setHitboxSize(target, true)
+            -- Desfaz aumento dos outros
             for _, p in pairs(game.Players:GetPlayers()) do
                 if p ~= player and p ~= target then setHitboxSize(p,false) end
             end
-            updateAimlockHighlight(target)
         else
             updateAimlockHighlight(nil)
             for _, p in pairs(game.Players:GetPlayers()) do
@@ -543,83 +534,157 @@ end
 function stopGrudarMira()
     if grudarMiraConn then grudarMiraConn:Disconnect() end
     updateAimlockHighlight(nil)
-    removeAllEnemyHighlights()
     for _, p in pairs(game.Players:GetPlayers()) do
         if p ~= player then setHitboxSize(p,false) end
     end
 end
 
--- FLY (mobile/setas)
-function ativarFly()
-    if flyConn then flyConn:Disconnect() end
-    local char = player.Character or player.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not hrp then return end
-    humanoid.PlatformStand = true
+-- ==== FLY MOBILE (DELTA) ====
+do
+    local flySpeed = 50
+    local UIS = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local StarterGui = game:GetService("StarterGui")
 
-    if not UpBtn then
-        UpBtn = Instance.new("TextButton")
-        UpBtn.Size = UDim2.new(0, 44, 0, 44)
-        UpBtn.Position = UDim2.new(1, -110, 1, -180)
-        UpBtn.AnchorPoint = Vector2.new(0.5,0.5)
-        UpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 230)
-        UpBtn.Text = "▲"
-        UpBtn.TextScaled = true
-        UpBtn.Font = Enum.Font.GothamBold
-        UpBtn.TextColor3 = Color3.new(1,1,1)
-        Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1,0)
-        UpBtn.Parent = gui
-        UpBtn.Visible = false
-        UpBtn.MouseButton1Down:Connect(function() flyVertical = 1 end)
-        UpBtn.MouseButton1Up:Connect(function() flyVertical = 0 end)
-        UpBtn.TouchTap:Connect(function() flyVertical = 1 end)
-        UpBtn.TouchLongPress:Connect(function() flyVertical = 0 end)
+    local function isFlyLiberadoNoPainel()
+        return _G.FlyLiberadoNoPainel == true
     end
-    if not DownBtn then
-        DownBtn = Instance.new("TextButton")
-        DownBtn.Size = UDim2.new(0, 44, 0, 44)
-        DownBtn.Position = UDim2.new(1, -110, 1, -120)
-        DownBtn.AnchorPoint = Vector2.new(0.5,0.5)
-        DownBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 255)
-        DownBtn.Text = "▼"
-        DownBtn.TextScaled = true
-        DownBtn.Font = Enum.Font.GothamBold
-        DownBtn.TextColor3 = Color3.new(1,1,1)
-        Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1,0)
-        DownBtn.Parent = gui
-        DownBtn.Visible = false
-        DownBtn.MouseButton1Down:Connect(function() flyVertical = -1 end)
-        DownBtn.MouseButton1Up:Connect(function() flyVertical = 0 end)
-        DownBtn.TouchTap:Connect(function() flyVertical = -1 end)
-        DownBtn.TouchLongPress:Connect(function() flyVertical = 0 end)
-    end
-    UpBtn.Visible = true
-    DownBtn.Visible = true
 
-    flyConn = game:GetService("RunService").RenderStepped:Connect(function()
-        if not estado.fly then return end
-        if not humanoid or not humanoid.Parent then return end
-        local moveDir = humanoid.MoveDirection
-        local vertical = flyVertical * 50
-        hrp.Velocity = Vector3.new(moveDir.X * 50, vertical, moveDir.Z * 50)
+    local function waitChar()
+        local char = player.Character or player.CharacterAdded:Wait()
+        return char, char:WaitForChild("Humanoid"), char:WaitForChild("HumanoidRootPart")
+    end
+
+    local character, humanoid, humanoidRootPart = waitChar()
+    local flying = false
+    local flyConn
+    local movement = Vector3.new()
+    local vertical = 0
+
+    local function createButton(name, pos, txt, size)
+        local btn = Instance.new("ScreenGui")
+        btn.Name = name.."Gui"
+        btn.ResetOnSpawn = false
+        btn.Parent = game.CoreGui or player:WaitForChild("PlayerGui")
+        local b = Instance.new("TextButton")
+        b.Name = name
+        b.Text = txt
+        b.Size = size or UDim2.new(0, 100, 0, 100)
+        b.Position = pos
+        b.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        b.TextColor3 = Color3.fromRGB(255,255,255)
+        b.BackgroundTransparency = 0.35
+        b.Font = Enum.Font.GothamBold
+        b.TextScaled = true
+        b.Parent = btn
+        return b
+    end
+
+    local btnUp = createButton("BtnUp", UDim2.new(1, -110, 1, -250), "▲")
+    local btnDown = createButton("BtnDown", UDim2.new(1, -110, 1, -130), "▼")
+    local btnFly = createButton("BtnFly", UDim2.new(1, -160, 1, -370), "Fly", UDim2.new(0,100,0,50))
+
+    btnUp.Visible = false
+    btnDown.Visible = false
+    btnFly.Visible = false
+
+    btnUp.MouseButton1Down:Connect(function()
+        if flying then vertical = 1 end
     end)
-end
+    btnUp.MouseButton1Up:Connect(function()
+        if flying then vertical = 0 end
+    end)
+    btnDown.MouseButton1Down:Connect(function()
+        if flying then vertical = -1 end
+    end)
+    btnDown.MouseButton1Up:Connect(function()
+        if flying then vertical = 0 end
+    end)
 
-function desativarFly()
-    if flyConn then flyConn:Disconnect() end
-    local char = player.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").PlatformStand = false
+    local function startFly()
+        if flying then return end
+        flying = true
+        local bodyVel = Instance.new("BodyVelocity")
+        bodyVel.Name = "Delta_FlyVel"
+        bodyVel.MaxForce = Vector3.new(1, 1, 1) * 1e6
+        bodyVel.Parent = humanoidRootPart
+        humanoid.Sit = true
+        btnUp.Visible = true
+        btnDown.Visible = true
+        btnFly.Text = "Unfly"
+        flyConn = RunService.RenderStepped:Connect(function()
+            bodyVel.Velocity = Vector3.new(
+                movement.X * flySpeed,
+                vertical * flySpeed,
+                movement.Z * flySpeed
+            )
+            if flying and not humanoid.Sit then
+                humanoid.Sit = true
+            end
+        end)
+        StarterGui:SetCore("SendNotification", {
+            Title = "FLY ATIVADO",
+            Text = "Voo ativado (sentado)! Use o analógico para mover, ▲/▼ para subir/descer.",
+            Duration = 4
+        })
     end
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.Velocity = Vector3.new(0,0,0) end
-    if UpBtn then UpBtn.Visible = false end
-    if DownBtn then DownBtn.Visible = false end
-    flyVertical = 0
+
+    local function stopFly()
+        flying = false
+        if humanoidRootPart:FindFirstChild("Delta_FlyVel") then
+            humanoidRootPart.Delta_FlyVel:Destroy()
+        end
+        if flyConn then
+            flyConn:Disconnect()
+        end
+        vertical = 0
+        btnUp.Visible = false
+        btnDown.Visible = false
+        btnFly.Text = "Fly"
+        humanoid.Sit = false
+        StarterGui:SetCore("SendNotification", {
+            Title = "FLY DESATIVADO",
+            Text = "Voo desligado.",
+            Duration = 3
+        })
+    end
+
+    btnFly.MouseButton1Click:Connect(function()
+        if flying then
+            stopFly()
+        else
+            startFly()
+        end
+    end)
+
+    local function updateMovement()
+        if UIS.TouchEnabled then
+            if humanoid then
+                local moveDir = humanoid.MoveDirection
+                if flying then
+                    movement = Vector3.new(moveDir.X, 0, moveDir.Z)
+                end
+            end
+        end
+    end
+
+    RunService.RenderStepped:Connect(updateMovement)
+
+    local function painelCheckLoop()
+        while true do
+            local liberado = isFlyLiberadoNoPainel()
+            btnFly.Visible = liberado
+            if not liberado and flying then
+                stopFly()
+            end
+            wait(0.5)
+        end
+    end
+
+    spawn(painelCheckLoop)
 end
 
--- INVISIBILIDADE
+-- ==== INVISIBILIDADE ====
 local invisParts = {}
 function ativarInvisibilidade()
     local char = player.Character or player.CharacterAdded:Wait()
@@ -668,7 +733,7 @@ function desativarInvisibilidade()
     invisParts = {}
 end
 
--- MANTER FUNÇÕES ATIVAS APÓS MORRER/RESPAWN
+-- ==== MANTER FUNÇÕES APÓS RESPAWN ====
 player.CharacterAdded:Connect(function()
     wait(1)
     if estado.esp then ativarESP() end
@@ -686,7 +751,7 @@ player.CharacterAdded:Connect(function()
         end)
     end
     if estado.grudarMira then startGrudarMira() end
-    if estado.fly then ativarFly() end
+    if estado.fly then _G.FlyLiberadoNoPainel = true else _G.FlyLiberadoNoPainel = false end
     if estado.invis then ativarInvisibilidade() end
     if estado.esp or estado.grudarMira then
         highlightAllEnemies()
